@@ -274,17 +274,27 @@
             }
         }
 
-        /* Add offline support indicator */
+        /* Add offline support styles */
         .offline-indicator {
             position: fixed;
             top: 0;
-            left: 0;
-            right: 0;
-            background-color: #ffc107;
-            color: #000;
-            text-align: center;
-            padding: 0.5rem;
-            z-index: 9999;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 0 0 5px 5px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .offline-warning {
+            background-color: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
             display: none;
         }
 
@@ -306,6 +316,11 @@
 </head>
 
 <body class="bg-light">
+    <!-- Add offline indicator at the top of the body -->
+    <div class="offline-indicator" id="offlineIndicator">
+        You are currently offline. Some features may be limited.
+    </div>
+
     <div class="container py-4">
         <h2 class="mb-4">File Manager</h2>
 
@@ -341,7 +356,7 @@
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createFolderModal">
                         <i class="fas fa-folder-plus"></i> Create Folder
                     </button>
-                    {% endif %}
+    {% endif %}
                 </div>
             </div>
         </div>
@@ -400,13 +415,13 @@
                     </button>
                 </div>
             </div>
-            {% endfor %}
+        {% endfor %}
         </div>
 
         <!-- Files Section -->
         <h3 class="section-title">Files</h3>
         <div class="file-grid">
-            {% for file in files %}
+        {% for file in files %}
             <div class="file-card">
                 <div class="form-check position-absolute p-2">
                     <input class="form-check-input select-item" type="checkbox" data-name="{{ file.name }}"
@@ -414,11 +429,11 @@
                 </div>
                 <div class="preview-container">
                     {% set file_extension = file.name.rsplit('.', 1)[1].lower() %}
-                    {% if file_extension in ['png', 'jpg', 'jpeg'] %}
+            {% if file_extension in ['png', 'jpg', 'jpeg'] %}
                     <img src="{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}" alt="{{ file.name }}"
                         class="preview-image"
                         onclick="previewImage('{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}', '{{ file.name }}')">
-                    {% elif file_extension == 'pdf' %}
+            {% elif file_extension == 'pdf' %}
                     <i class="fas fa-file-pdf preview-icon text-danger"></i>
                     {% elif file_extension in ['doc', 'docx'] %}
                     <i class="fas fa-file-word preview-icon text-primary"></i>
@@ -428,9 +443,9 @@
                     <i class="fas fa-file-archive preview-icon text-warning"></i>
                     {% elif file_extension == 'pptx' %}
                     <i class="fas fa-file-powerpoint preview-icon text-danger"></i>
-                    {% else %}
+            {% else %}
                     <i class="fas fa-file preview-icon text-secondary"></i>
-                    {% endif %}
+            {% endif %}
                 </div>
                 <div class="file-info">
                     <div class="file-name">{{ file.name }}</div>
@@ -570,7 +585,7 @@
                             <label for="newName" class="form-label">New Name</label>
                             <input type="text" class="form-control" id="newName" required autofocus>
                         </div>
-                    </form>
+            </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -630,9 +645,9 @@
         </div>
     </div>
 
-    <!-- Add offline indicator -->
-    <div class="offline-indicator" id="offlineIndicator">
-        You are currently offline. Some features may be limited.
+    <!-- Add offline warning -->
+    <div class="offline-warning" id="offlineWarning">
+        You are currently offline. Some features may be limited. Changes will be synced when you're back online.
     </div>
 
     <!-- Add pull-to-refresh indicator -->
@@ -1313,53 +1328,105 @@
             modal.show();
         }
 
-        // Add offline detection
-        window.addEventListener('online', function () {
-            document.getElementById('offlineIndicator').style.display = 'none';
-        });
+        // Enhanced offline handling
+        let isOffline = false;
+        let offlineQueue = [];
 
-        window.addEventListener('offline', function () {
-            document.getElementById('offlineIndicator').style.display = 'block';
-        });
+        // Check connection status
+        function checkConnection() {
+            const online = navigator.onLine;
+            const offlineIndicator = document.getElementById('offlineIndicator');
+            const offlineWarning = document.getElementById('offlineWarning');
 
-        // Add pull-to-refresh functionality
-        let touchStartY = 0;
-        let pullRefresh = document.getElementById('pullRefresh');
-        let isRefreshing = false;
+            if (!online && !isOffline) {
+                isOffline = true;
+                if (offlineIndicator) offlineIndicator.style.display = 'block';
+                if (offlineWarning) offlineWarning.style.display = 'block';
+                showToast('You are now offline. Some features may be limited.', 'warning');
+            } else if (online && isOffline) {
+                isOffline = false;
+                if (offlineIndicator) offlineIndicator.style.display = 'none';
+                if (offlineWarning) offlineWarning.style.display = 'none';
+                showToast('You are back online! Syncing changes...', 'success');
+                syncOfflineChanges();
+            }
+        }
 
-        document.addEventListener('touchstart', function (e) {
-            touchStartY = e.touches[0].clientY;
-        });
+        // Handle offline changes
+        function handleOfflineOperation(operation) {
+            if (isOffline) {
+                offlineQueue.push(operation);
+                localStorage.setItem('offlineQueue', JSON.stringify(offlineQueue));
+                showToast('Operation queued for sync when online', 'info');
+            }
+            return operation();
+        }
 
-        document.addEventListener('touchmove', function (e) {
-            if (window.scrollY === 0 && !isRefreshing) {
-                const touchY = e.touches[0].clientY;
-                const pullDistance = touchY - touchStartY;
+        // Sync offline changes
+        async function syncOfflineChanges() {
+            const queue = JSON.parse(localStorage.getItem('offlineQueue') || '[]');
+            if (queue.length === 0) return;
 
-                if (pullDistance > 0) {
-                    pullRefresh.style.transform = `translateY(${Math.min(pullDistance, 50)}px)`;
+            showToast(`Syncing ${queue.length} offline changes...`, 'info');
+
+            for (const operation of queue) {
+                try {
+                    await operation();
+                    queue.shift();
+                    localStorage.setItem('offlineQueue', JSON.stringify(queue));
+                } catch (error) {
+                    console.error('Error syncing operation:', error);
+                    showToast('Error syncing some changes', 'error');
                 }
             }
-        });
 
-        document.addEventListener('touchend', function () {
-            if (pullRefresh.style.transform && parseInt(pullRefresh.style.transform.split('(')[1]) > 40) {
-                isRefreshing = true;
-                pullRefresh.style.transform = 'translateY(50px)';
-                window.location.reload();
-            } else {
-                pullRefresh.style.transform = 'translateY(0)';
+            if (queue.length === 0) {
+                showToast('All changes synced successfully!', 'success');
+            }
+        }
+
+        // Enhanced event listeners
+        window.addEventListener('online', checkConnection);
+        window.addEventListener('offline', checkConnection);
+
+        // Check connection status on load
+        document.addEventListener('DOMContentLoaded', () => {
+            checkConnection();
+
+            // Register service worker
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful');
+                    })
+                    .catch(err => {
+                        console.log('ServiceWorker registration failed: ', err);
+                    });
             }
         });
 
-        // Add service worker registration for offline support
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function () {
-                navigator.serviceWorker.register('/static/sw.js').then(function (registration) {
-                    console.log('ServiceWorker registration successful');
-                }).catch(function (err) {
-                    console.log('ServiceWorker registration failed: ', err);
-                });
+        // Modify existing operations to handle offline state
+        async function uploadOperation(password) {
+            return handleOfflineOperation(async () => {
+                // Existing upload code
+            });
+        }
+
+        async function createFolderOperation(password) {
+            return handleOfflineOperation(async () => {
+                // Existing create folder code
+            });
+        }
+
+        async function deleteOperation(password) {
+            return handleOfflineOperation(async () => {
+                // Existing delete code
+            });
+        }
+
+        async function renameOperation(password) {
+            return handleOfflineOperation(async () => {
+                // Existing rename code
             });
         }
     </script>
