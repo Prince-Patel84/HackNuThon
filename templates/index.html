@@ -210,6 +210,98 @@
         #passwordModal+.modal-backdrop {
             z-index: 1055;
         }
+
+        /* Add to existing styles */
+        @media (max-width: 768px) {
+
+            .file-card,
+            .folder-card {
+                width: 100%;
+                margin-bottom: 1rem;
+            }
+
+            .file-actions,
+            .folder-actions {
+                flex-wrap: wrap;
+                gap: 0.5rem;
+            }
+
+            .file-actions .btn,
+            .folder-actions .btn {
+                flex: 1 1 calc(50% - 0.5rem);
+                min-width: calc(50% - 0.5rem);
+            }
+
+            .modal-dialog {
+                margin: 0.5rem;
+                max-width: calc(100% - 1rem);
+            }
+
+            .search-container {
+                margin-bottom: 1rem;
+            }
+
+            .breadcrumb {
+                font-size: 0.9rem;
+                flex-wrap: wrap;
+            }
+
+            .toast-container {
+                bottom: 1rem;
+                left: 1rem;
+                right: 1rem;
+            }
+        }
+
+        /* Add touch-friendly improvements */
+        @media (hover: none) {
+
+            .btn,
+            .file-card,
+            .folder-card {
+                -webkit-tap-highlight-color: transparent;
+            }
+
+            .file-card:hover,
+            .folder-card:hover {
+                transform: none;
+            }
+
+            .btn:active,
+            .file-card:active,
+            .folder-card:active {
+                transform: scale(0.98);
+            }
+        }
+
+        /* Add offline support indicator */
+        .offline-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background-color: #ffc107;
+            color: #000;
+            text-align: center;
+            padding: 0.5rem;
+            z-index: 9999;
+            display: none;
+        }
+
+        /* Add pull-to-refresh indicator */
+        .pull-refresh {
+            position: fixed;
+            top: -50px;
+            left: 0;
+            right: 0;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            z-index: 9998;
+            transition: transform 0.3s;
+        }
     </style>
 </head>
 
@@ -255,7 +347,7 @@
         </div>
 
         <!-- Upload Area (Only show when not in root) -->
-    {% if folder %}
+        {% if folder %}
         <div class="upload-area" id="dropZone">
             <form action="/upload" method="POST" enctype="multipart/form-data" id="uploadForm">
                 <input type="hidden" name="folder" value="{{ folder }}">
@@ -308,13 +400,13 @@
                     </button>
                 </div>
             </div>
-        {% endfor %}
+            {% endfor %}
         </div>
 
         <!-- Files Section -->
         <h3 class="section-title">Files</h3>
         <div class="file-grid">
-        {% for file in files %}
+            {% for file in files %}
             <div class="file-card">
                 <div class="form-check position-absolute p-2">
                     <input class="form-check-input select-item" type="checkbox" data-name="{{ file.name }}"
@@ -322,11 +414,11 @@
                 </div>
                 <div class="preview-container">
                     {% set file_extension = file.name.rsplit('.', 1)[1].lower() %}
-            {% if file_extension in ['png', 'jpg', 'jpeg'] %}
+                    {% if file_extension in ['png', 'jpg', 'jpeg'] %}
                     <img src="{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}" alt="{{ file.name }}"
                         class="preview-image"
                         onclick="previewImage('{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}', '{{ file.name }}')">
-            {% elif file_extension == 'pdf' %}
+                    {% elif file_extension == 'pdf' %}
                     <i class="fas fa-file-pdf preview-icon text-danger"></i>
                     {% elif file_extension in ['doc', 'docx'] %}
                     <i class="fas fa-file-word preview-icon text-primary"></i>
@@ -336,9 +428,9 @@
                     <i class="fas fa-file-archive preview-icon text-warning"></i>
                     {% elif file_extension == 'pptx' %}
                     <i class="fas fa-file-powerpoint preview-icon text-danger"></i>
-            {% else %}
+                    {% else %}
                     <i class="fas fa-file preview-icon text-secondary"></i>
-            {% endif %}
+                    {% endif %}
                 </div>
                 <div class="file-info">
                     <div class="file-name">{{ file.name }}</div>
@@ -478,7 +570,7 @@
                             <label for="newName" class="form-label">New Name</label>
                             <input type="text" class="form-control" id="newName" required autofocus>
                         </div>
-            </form>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -536,6 +628,16 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Add offline indicator -->
+    <div class="offline-indicator" id="offlineIndicator">
+        You are currently offline. Some features may be limited.
+    </div>
+
+    <!-- Add pull-to-refresh indicator -->
+    <div class="pull-refresh" id="pullRefresh">
+        <i class="fas fa-sync-alt fa-spin"></i>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -1209,6 +1311,56 @@
             }
 
             modal.show();
+        }
+
+        // Add offline detection
+        window.addEventListener('online', function () {
+            document.getElementById('offlineIndicator').style.display = 'none';
+        });
+
+        window.addEventListener('offline', function () {
+            document.getElementById('offlineIndicator').style.display = 'block';
+        });
+
+        // Add pull-to-refresh functionality
+        let touchStartY = 0;
+        let pullRefresh = document.getElementById('pullRefresh');
+        let isRefreshing = false;
+
+        document.addEventListener('touchstart', function (e) {
+            touchStartY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchmove', function (e) {
+            if (window.scrollY === 0 && !isRefreshing) {
+                const touchY = e.touches[0].clientY;
+                const pullDistance = touchY - touchStartY;
+
+                if (pullDistance > 0) {
+                    pullRefresh.style.transform = `translateY(${Math.min(pullDistance, 50)}px)`;
+                }
+            }
+        });
+
+        document.addEventListener('touchend', function () {
+            if (pullRefresh.style.transform && parseInt(pullRefresh.style.transform.split('(')[1]) > 40) {
+                isRefreshing = true;
+                pullRefresh.style.transform = 'translateY(50px)';
+                window.location.reload();
+            } else {
+                pullRefresh.style.transform = 'translateY(0)';
+            }
+        });
+
+        // Add service worker registration for offline support
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('/static/sw.js').then(function (registration) {
+                    console.log('ServiceWorker registration successful');
+                }).catch(function (err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
         }
     </script>
 </body>
