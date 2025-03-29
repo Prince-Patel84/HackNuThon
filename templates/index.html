@@ -39,9 +39,16 @@
         }
 
         .preview-image {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .preview-image:hover {
+            transform: scale(1.05);
         }
 
         .preview-icon {
@@ -176,6 +183,33 @@
         #deleteSelectedBtn {
             transition: all 0.3s ease;
         }
+
+        #previewImage {
+            max-height: 80vh;
+            width: auto;
+            max-width: 100%;
+        }
+
+        .modal-body {
+            background-color: #f8f9fa;
+        }
+
+        /* Fix modal stacking */
+        .modal {
+            z-index: 1050;
+        }
+
+        .modal-backdrop {
+            z-index: 1040;
+        }
+
+        #passwordModal {
+            z-index: 1060;
+        }
+
+        #passwordModal+.modal-backdrop {
+            z-index: 1055;
+        }
     </style>
 </head>
 
@@ -221,7 +255,7 @@
         </div>
 
         <!-- Upload Area (Only show when not in root) -->
-        {% if folder %}
+    {% if folder %}
         <div class="upload-area" id="dropZone">
             <form action="/upload" method="POST" enctype="multipart/form-data" id="uploadForm">
                 <input type="hidden" name="folder" value="{{ folder }}">
@@ -263,18 +297,24 @@
                     <a href="{{ url_for('list_files', folder=folder + '/' + f) }}" class="btn btn-primary btn-sm">
                         <i class="fas fa-folder-open"></i> Open
                     </a>
+                    <button class="btn btn-info btn-sm" onclick="generateQR('{{ folder }}', '{{ f }}')">
+                        <i class="fas fa-qrcode"></i>
+                    </button>
+                    <button class="btn btn-warning btn-sm" onclick="showRenameModal('{{ folder }}', '{{ f }}', true)">
+                        <i class="fas fa-edit"></i>
+                    </button>
                     <button class="btn btn-danger btn-sm" onclick="deleteItem('{{ folder }}', '{{ f }}', true)">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
             </div>
-            {% endfor %}
+        {% endfor %}
         </div>
 
         <!-- Files Section -->
         <h3 class="section-title">Files</h3>
         <div class="file-grid">
-            {% for file in files %}
+        {% for file in files %}
             <div class="file-card">
                 <div class="form-check position-absolute p-2">
                     <input class="form-check-input select-item" type="checkbox" data-name="{{ file.name }}"
@@ -282,9 +322,11 @@
                 </div>
                 <div class="preview-container">
                     {% set file_extension = file.name.rsplit('.', 1)[1].lower() %}
-                    {% if file_extension in ['png', 'jpg', 'jpeg'] %}
-                    <i class="fas fa-image preview-icon text-primary"></i>
-                    {% elif file_extension == 'pdf' %}
+            {% if file_extension in ['png', 'jpg', 'jpeg'] %}
+                    <img src="{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}" alt="{{ file.name }}"
+                        class="preview-image"
+                        onclick="previewImage('{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}', '{{ file.name }}')">
+            {% elif file_extension == 'pdf' %}
                     <i class="fas fa-file-pdf preview-icon text-danger"></i>
                     {% elif file_extension in ['doc', 'docx'] %}
                     <i class="fas fa-file-word preview-icon text-primary"></i>
@@ -294,9 +336,9 @@
                     <i class="fas fa-file-archive preview-icon text-warning"></i>
                     {% elif file_extension == 'pptx' %}
                     <i class="fas fa-file-powerpoint preview-icon text-danger"></i>
-                    {% else %}
+            {% else %}
                     <i class="fas fa-file preview-icon text-secondary"></i>
-                    {% endif %}
+            {% endif %}
                 </div>
                 <div class="file-info">
                     <div class="file-name">{{ file.name }}</div>
@@ -310,6 +352,14 @@
                         download="{{ file.name }}" class="btn btn-sm btn-primary">
                         <i class="fas fa-download"></i>
                     </a>
+                    <button class="btn btn-sm btn-info"
+                        onclick="previewFile('{{ folder }}', '{{ file.name }}', '{{ file.name.split('.')[-1].lower() }}')">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                    <button class="btn btn-sm btn-warning"
+                        onclick="showRenameModal('{{ folder }}', '{{ file.name }}', false)">
+                        <i class="fas fa-edit"></i>
+                    </button>
                     <button class="btn btn-sm btn-danger"
                         onclick="deleteItem('{{ folder }}', '{{ file.name }}', false)">
                         <i class="fas fa-trash"></i>
@@ -389,6 +439,100 @@
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" form="passwordForm" class="btn btn-primary"
                         id="submitPassword">Submit</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Preview Modal -->
+    <div class="modal fade" id="imagePreviewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Image Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center p-0">
+                    <img id="previewImage" src="" alt="Preview" class="img-fluid">
+                </div>
+                <div class="modal-footer">
+                    <a id="downloadImage" href="" class="btn btn-primary" download>
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename Modal -->
+    <div class="modal fade" id="renameModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Rename Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="renameForm" onsubmit="event.preventDefault(); renameItem();">
+                        <div class="mb-3">
+                            <label for="newName" class="form-label">New Name</label>
+                            <input type="text" class="form-control" id="newName" required autofocus>
+                        </div>
+            </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" form="renameForm" class="btn btn-primary">Rename</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Code Modal -->
+    <div class="modal fade" id="qrCodeModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Folder QR Code</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <div id="qrCodeContainer" class="mb-3">
+                        <img id="qrCodeImage" src="" alt="QR Code" class="img-fluid">
+                    </div>
+                    <div class="folder-name-container p-3 bg-light rounded">
+                        <h6 class="mb-0" id="folderNameDisplay"></h6>
+                    </div>
+                    <p class="text-muted mt-3">Scan this QR code to access the folder</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" onclick="downloadQRCode()">
+                        <i class="fas fa-download"></i> Download
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Preview Modal -->
+    <div class="modal fade" id="previewModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">File Preview</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="previewContainer" class="text-center">
+                        <!-- Content will be loaded here -->
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a id="previewDownloadBtn" href="#" class="btn btn-primary" download>
+                        <i class="fas fa-download"></i> Download
+                    </a>
                 </div>
             </div>
         </div>
@@ -803,14 +947,12 @@
 
                 for (const item of itemsToDelete) {
                     try {
-                        const formData = new FormData();
-                        formData.append('folder', item.parentFolder);
-                        formData.append('item', item.name);
-                        formData.append('password', password);
-
                         const response = await fetch('/delete', {
                             method: 'POST',
-                            body: formData
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                            },
+                            body: `folder=${encodeURIComponent(item.parentFolder)}&item=${encodeURIComponent(item.name)}&password=${encodeURIComponent(password)}`
                         });
 
                         const result = await response.json();
@@ -842,6 +984,232 @@
                 await deleteMultipleOperation(cachedPassword);
             }
         });
+
+        function previewImage(imageUrl, fileName) {
+            const modal = new bootstrap.Modal(document.getElementById('imagePreviewModal'));
+            const previewImage = document.getElementById('previewImage');
+            const downloadImage = document.ge('downloadImage');
+
+            previewImage.src = imageUrl;
+            downloadImage.href = imageUrl;
+            downloadImage.doeName;
+
+            modal.show();
+        }
+        let renameData = {
+            folder: '',
+            oldName: '',
+            isFolder: false
+        };
+
+        function showRenameModal(folder, oldName, isFolder) {
+            renameData = { folder, oldName, isFolder };
+            const modal = new bootstrap.Modal(document.getElementById('renameModal'));
+            const newNameInput = document.getElementById('newName');
+
+            // Set the current name as the default value
+            newNameInput.value = oldName;
+
+            modal.show();
+        }
+
+        // Rename modal focus
+        const renameModal = document.getElementById('renameModal');
+        renameModal.addEventListener('shown.bs.modal', function () {
+            document.getElementById('newName').focus();
+        });
+
+        async function renameItem() {
+            const newName = document.getElementById('newName').value.trim();
+            if (!newName) {
+                showToast('Please enter a new name', 'error');
+                return;
+            }
+
+            const renameOperation = async (password) => {
+                try {
+                    const response = await fetch('/rename', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/x-www-form-urlencoded',
+                        },
+                        body: `folder=${encodeURIComponent(renameData.folder)}&old_name=${encodeURIComponent(renameData.oldName)}&new_name=${encodeURIComponent(newName)}&is_folder=${renameData.isFolder}&password=${encodeURIComponent(password)}`
+                    });
+
+                    const result = await response.json();
+
+                    if (result.error) {
+                        showToast(result.error, 'error');
+                        return;
+                    }
+
+                    showToast('Item renamed successfully');
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('renameModal'));
+                    modal.hide();
+                    window.location.reload();
+                } catch (error) {
+                    showToast('Error renaming item', 'error');
+                }
+            };
+
+            if (!cachedPassword) {
+                showPasswordModal(renameOperation);
+            } else {
+                await renameOperation(cachedPassword);
+            }
+        }
+
+        // Add event listener for Enter key in the rename modal
+        document.getElementById('renameModal').addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                renameItem();
+            }
+        });
+
+        async function generateQR(folder, folderName) {
+            try {
+                const response = await fetch('/generate_qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `folder=${encodeURIComponent(folder + '/' + folderName)}`
+                });
+
+                const result = await response.json();
+
+                if (result.error) {
+                    showToast(result.error, 'error');
+                    return;
+                }
+
+                const modal = new bootstrap.Modal(document.getElementById('qrCodeModal'));
+                const qrCodeImage = document.getElementById('qrCodeImage');
+                const folderNameDisplay = document.getElementById('folderNameDisplay');
+
+                qrCodeImage.src = `data:image/png;base64,${result.qr_code}`;
+                folderNameDisplay.textContent = folderName;
+
+                modal.show();
+            } catch (error) {
+                showToast('Error generating QR code', 'error');
+            }
+        }
+
+        function downloadQRCode() {
+            const qrCodeImage = document.getElementById('qrCodeImage');
+            const folderName = document.getElementById('folderNameDisplay').textContent;
+            const link = document.createElement('a');
+            link.download = `${folderName}-qr-code.png`;
+            link.href = qrCodeImage.src;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function previewFile(folder, filename, fileType) {
+            const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+            const container = document.getElementById('previewContainer');
+            const downloadBtn = document.getElementById('previewDownloadBtn');
+
+            // Set download link
+            downloadBtn.href = `/uploads/${folder}/${filename}`;
+
+            // Clear previous content
+            container.innerHTML = '';
+
+            // Handle different file types
+            switch (fileType) {
+                case 'jpg':
+                case 'jpeg':
+                case 'png':
+                case 'gif':
+                    // Image preview
+                    const img = document.createElement('img');
+                    img.src = `/uploads/${folder}/${filename}`;
+                    img.className = 'img-fluid';
+                    img.style.maxHeight = '70vh';
+                    container.appendChild(img);
+                    break;
+
+                case 'pdf':
+                    // PDF preview
+                    const pdfEmbed = document.createElement('embed');
+                    pdfEmbed.src = `/uploads/${folder}/${filename}`;
+                    pdfEmbed.type = 'application/pdf';
+                    pdfEmbed.style.width = '100%';
+                    pdfEmbed.style.height = '70vh';
+                    container.appendChild(pdfEmbed);
+                    break;
+
+                case 'txt':
+                    // Text file preview
+                    try {
+                        const response = await fetch(`/uploads/${folder}/${filename}`);
+                        const text = await response.text();
+                        const pre = document.createElement('pre');
+                        pre.className = 'text-start bg-light p-3 rounded';
+                        pre.style.maxHeight = '70vh';
+                        pre.style.overflow = 'auto';
+                        pre.textContent = text;
+                        container.appendChild(pre);
+                    } catch (error) {
+                        container.innerHTML = '<p class="text-danger">Error loading text file</p>';
+                    }
+                    break;
+
+                case 'doc':
+                case 'docx':
+                    // Word document preview
+                    container.innerHTML = `
+                        <div class="text-center p-4">
+                            <i class="fas fa-file-word fa-4x text-primary mb-3"></i>
+                            <h5>Word Document</h5>
+                            <p class="text-muted">${filename}</p>
+                            <p>This file type cannot be previewed directly. Please download to view.</p>
+                        </div>
+                    `;
+                    break;
+
+                case 'pptx':
+                    // PowerPoint preview
+                    container.innerHTML = `
+                        <div class="text-center p-4">
+                            <i class="fas fa-file-powerpoint fa-4x text-danger mb-3"></i>
+                            <h5>PowerPoint Presentation</h5>
+                            <p class="text-muted">${filename}</p>
+                            <p>This file type cannot be previewed directly. Please download to view.</p>
+                        </div>
+                    `;
+                    break;
+
+                case 'zip':
+                case 'rar':
+                    // Archive preview
+                    container.innerHTML = `
+                        <div class="text-center p-4">
+                            <i class="fas fa-file-archive fa-4x text-warning mb-3"></i>
+                            <h5>Compressed Archive</h5>
+                            <p class="text-muted">${filename}</p>
+                            <p>This file type cannot be previewed directly. Please download to extract.</p>
+                        </div>
+                    `;
+                    break;
+
+                default:
+                    container.innerHTML = `
+                        <div class="text-center p-4">
+                            <i class="fas fa-file fa-4x text-secondary mb-3"></i>
+                            <h5>File Preview</h5>
+                            <p class="text-muted">${filename}</p>
+                            <p>This file type cannot be previewed directly. Please download to view.</p>
+                        </div>
+                    `;
+            }
+
+            modal.show();
+        }
     </script>
 </body>
 

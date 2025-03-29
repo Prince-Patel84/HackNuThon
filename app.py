@@ -6,6 +6,10 @@ from datetime import datetime
 import json
 from pathlib import Path
 from functools import wraps
+import qrcode
+from io import BytesIO
+import base64
+from PIL import Image, ImageDraw, ImageFont
 
 app = Flask(__name__)
 
@@ -209,7 +213,149 @@ def uploaded_file(filename):
     try:
         return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
     except Exception as e:
-        return jsonify({"error": str(e)}), 404
+        return str(e), 404
+
+@app.route("/download/<path:filename>")
+def download_file(filename):
+    try:
+        return send_from_directory(app.config["UPLOAD_FOLDER"], filename, as_attachment=True)
+    except Exception as e:
+        return str(e), 404
+
+# Rename File or Folder
+@app.route("/rename", methods=["POST"])
+@require_password
+def rename_item():
+    try:
+        folder = request.form.get("folder", "").strip()
+        old_name = request.form.get("old_name").strip()
+        new_name = request.form.get("new_name").strip()
+        is_folder = request.form.get("is_folder") == "true"
+
+        if not old_name or not new_name:
+            return jsonify({"error": "Old and new names are required"}), 400
+
+        # Prevent renaming in root directory for folders
+        if is_folder and not folder:
+            return jsonify({"error": "Folders can only be renamed in the root directory"}), 400
+
+        # Get the full paths
+        old_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, old_name)
+        new_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, new_name)
+
+        # Check if old path exists
+        if not os.path.exists(old_path):
+            return jsonify({"error": "Item does not exist"}), 404
+
+        # If renaming a file (not a folder), preserve the extension
+        if not is_folder:
+            old_ext = os.path.splitext(old_name)[1]
+            if not new_name.endswith(old_ext):
+                new_name = new_name + old_ext
+                new_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, new_name)
+
+        # Check if new name already exists
+        if os.path.exists(new_path):
+            return jsonify({"error": "An item with this name already exists"}), 400
+
+        # Rename the item
+        os.rename(old_path, new_path)
+
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# Remove File Extension
+@app.route("/remove_extension", methods=["POST"])
+@require_password
+def remove_extension():
+    try:
+        folder = request.form.get("folder", "").strip()
+        filename = request.form.get("filename").strip()
+        
+        if not filename:
+            return jsonify({"error": "Filename is required"}), 400
+
+        # Get the full paths
+        old_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, filename)
+        
+        # Check if file exists
+        if not os.path.exists(old_path):
+            return jsonify({"error": "File does not exist"}), 404
+            
+        # Check if it's a file (not a folder)
+        if os.path.isdir(old_path):
+            return jsonify({"error": "Cannot remove extension from a folder"}), 400
+            
+        # Get the new name without extension
+        new_name = os.path.splitext(filename)[0]
+        new_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, new_name)
+        
+        # Check if new name already exists
+        if os.path.exists(new_path):
+            return jsonify({"error": "A file with this name already exists"}), 400
+            
+        # Rename the file
+        os.rename(old_path, new_path)
+        
+        return jsonify({
+            "success": True,
+            "message": f"Extension removed from {filename}"
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/generate_qr", methods=["POST"])
+def generate_qr():
+    try:
+        folder = request.form.get("folder", "").strip()
+        # Generate the full URL for the folder, ensuring proper path formatting
+        folder_url = request.host_url.rstrip('/') + '/' + folder.lstrip('/') if folder else request.host_url.rstrip('/')
+        
+        # Create QR code
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(folder_url)
+        qr.make(fit=True)
+        
+        # Create image with extra space for text
+        img = qr.make_image(fill_color="black", back_color="white")
+        width, height = img.size
+        new_height = height + 120  # Increased space for larger text
+        
+        # Create new image with white background
+        new_img = Image.new('RGB', (width, new_height), 'white')
+        
+        # Convert QR code to RGB mode if it isn't already
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+            
+        # Paste QR code at the top
+        new_img.paste(img, (0, 0))
+        
+        # Add text
+        draw = ImageDraw.Draw(new_img)
+        
+        # Get folder name from path
+        folder_name = folder.split('/')[-1] if folder else "Home"
+        
+        # Use default font
+        font = ImageFont.load_default()
+        
+        # Calculate text position to center it
+        text_width = len(folder_name) * 20  # Increased width per character for larger text
+        text_position = ((width - text_width) // 2, height + 30)  # Adjusted vertical position
+        
+        # Draw text
+        draw.text(text_position, folder_name, fill="black", font=font)
+        
+        # Convert to base64
+        buffered = BytesIO()
+        new_img.save(buffered, format="PNG")
+        img_str = base64.b64encode(buffered.getvalue()).decode()
+        return jsonify({"success": True, "qr_code": img_str})
+    except Exception as e:
+        print(f"QR Code Generation Error: {str(e)}")  # Add error logging
+        return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(413)
 def request_entity_too_large(error):
