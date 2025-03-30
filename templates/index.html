@@ -16,11 +16,12 @@
         }
 
         .file-card {
+            position: relative;
             background: white;
             border-radius: 10px;
             box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
             transition: transform 0.2s, box-shadow 0.2s;
-            overflow: hidden;
+            overflow: visible;
         }
 
         .file-card:hover {
@@ -178,9 +179,37 @@
             border-bottom: 2px solid #e9ecef;
         }
 
-        .folder-card,
-        .file-card {
-            position: relative;
+        .file-card.selected {
+            background-color: rgba(0, 0, 0, 0.05);
+            border: 2px solid #dee2e6;
+        }
+
+        .file-card.selectable {
+            cursor: pointer;
+        }
+
+        .selection-mode-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            padding: 1rem;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+
+        .selection-mode-header.active {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .form-check {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 4px;
+            padding: 4px;
         }
 
         .form-check-input {
@@ -526,7 +555,7 @@
         <div class="file-grid">
             {% for file in files %}
             <div class="file-card">
-                <div class="form-check position-absolute p-2">
+                <div class="form-check position-absolute" style="top: 10px; left: 10px; z-index: 10;">
                     <input class="form-check-input select-item" type="checkbox" data-name="{{ file.name }}"
                         data-is-folder="false" data-parent-folder="{{ folder }}">
                 </div>
@@ -797,6 +826,21 @@
                     <button type="button" class="btn btn-primary" onclick="downloadProtectedFile()">Download</button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Update the selection mode header -->
+    <div class="selection-mode-header" id="selectionModeHeader">
+        <div>
+            <span id="selectedCount">0 selected</span>
+        </div>
+        <div>
+            <button class="btn btn-danger" id="bulkDeleteBtn" style="display: none;">
+                <i class="fas fa-trash"></i> Delete Selected
+            </button>
+            <button class="btn btn-secondary" onclick="exitSelectionMode()">
+                Cancel
+            </button>
         </div>
     </div>
 
@@ -1340,13 +1384,11 @@
 
                         if (result.error) {
                             errorCount++;
-                            console.error(`Failed to delete ${item.name}:`, result.error);
                         } else {
                             successCount++;
                         }
                     } catch (error) {
                         errorCount++;
-                        console.error(`Error deleting ${item.name}:`, error);
                     }
                 }
 
@@ -1852,6 +1894,123 @@
                 icon.classList.add('fa-eye');
             }
         }
+
+        let isSelectionMode = false;
+        let longPressTimer;
+        const selectionModeHeader = document.getElementById('selectionModeHeader');
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        const selectedCount = document.getElementById('selectedCount');
+
+        function toggleSelection(card) {
+            card.classList.toggle('selected');
+            updateSelectionCount();
+        }
+
+        function updateSelectionCount() {
+            const selectedCards = document.querySelectorAll('.file-card.selected');
+            const count = selectedCards.length;
+            selectedCount.textContent = `${count} selected`;
+            bulkDeleteBtn.style.display = count > 0 ? 'inline-block' : 'none';
+        }
+
+        function enterSelectionMode(initialCard) {
+            isSelectionMode = true;
+            selectionModeHeader.classList.add('active');
+            document.querySelectorAll('.file-card').forEach(card => {
+                card.classList.add('selectable');
+            });
+            toggleSelection(initialCard);
+        }
+
+        function exitSelectionMode() {
+            isSelectionMode = false;
+            selectionModeHeader.classList.remove('active');
+            document.querySelectorAll('.file-card').forEach(card => {
+                card.classList.remove('selectable', 'selected');
+            });
+            bulkDeleteBtn.style.display = 'none';
+        }
+
+        // Add event listeners to all file cards
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.file-card').forEach(card => {
+                // Long press detection
+                card.addEventListener('mousedown', (e) => {
+                    longPressTimer = setTimeout(() => {
+                        if (!isSelectionMode) {
+                            enterSelectionMode(card);
+                        }
+                    }, 500);
+                });
+
+                card.addEventListener('mouseup', () => {
+                    clearTimeout(longPressTimer);
+                });
+
+                card.addEventListener('mouseleave', () => {
+                    clearTimeout(longPressTimer);
+                });
+
+                // Click handling
+                card.addEventListener('click', (e) => {
+                    if (isSelectionMode) {
+                        toggleSelection(card);
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
+                });
+            });
+
+            // Add bulk delete button event listener
+            if (bulkDeleteBtn) {
+                bulkDeleteBtn.addEventListener('click', async function () {
+                    const selectedCards = document.querySelectorAll('.file-card.selected');
+                    const files = Array.from(selectedCards).map(card => card.dataset.filename);
+                    const folder = selectedCards[0]?.dataset.parentFolder || '';
+
+                    if (!files.length) return;
+
+                    if (!confirm(`Are you sure you want to delete ${files.length} file(s)?`)) {
+                        return;
+                    }
+
+                    const deleteOperation = async (password) => {
+                        try {
+                            const response = await fetch('/bulk_delete', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify({
+                                    files: files,
+                                    folder: folder,
+                                    password: password
+                                })
+                            });
+
+                            const result = await response.json();
+
+                            if (result.error) {
+                                showToast(result.error, 'error');
+                                return;
+                            }
+
+                            showToast(result.message);
+                            exitSelectionMode();
+                            window.location.reload();
+                        } catch (error) {
+                            showToast('Error deleting files', 'error');
+                        }
+                    };
+
+                    if (!cachedPassword) {
+                        showPasswordModal(deleteOperation);
+                    } else {
+                        await deleteOperation(cachedPassword);
+                    }
+                });
+            }
+        });
     </script>
 </body>
 

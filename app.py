@@ -467,6 +467,43 @@ def protected_download(filename):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route("/bulk_delete", methods=["POST"])
+@require_password
+def bulk_delete():
+    try:
+        files = request.json.get("files", [])
+        folder = request.json.get("folder", "").strip()
+        
+        if not files:
+            return jsonify({"error": "No files selected"}), 400
+
+        deleted_files = []
+        failed_files = []
+        
+        for file in files:
+            file_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, file)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    deleted_files.append(file)
+                else:
+                    failed_files.append(file)
+            except Exception as e:
+                failed_files.append(file)
+
+        message = f"Successfully deleted {len(deleted_files)} files"
+        if failed_files:
+            message += f", Failed to delete {len(failed_files)} files"
+
+        return jsonify({
+            "success": True,
+            "message": message,
+            "deleted": deleted_files,
+            "failed": failed_files
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.errorhandler(413)
 def request_entity_too_large(error):
     return jsonify({"error": "File too large"}), 413
