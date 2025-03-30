@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_from_directory, redirect, url_for, jsonify
+from flask import Flask, render_template, request, send_from_directory, redirect, url_for, jsonify, send_file
 from werkzeug.utils import secure_filename
 import os
 import shutil
@@ -10,6 +10,7 @@ import qrcode
 from io import BytesIO
 import base64
 from PIL import Image, ImageDraw, ImageFont
+from cryptography.fernet import Fernet
 
 app = Flask(__name__)
 
@@ -17,6 +18,10 @@ UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "pdf", "doc", "docx", "txt", "zip", "rar", "pptx"}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 ADMIN_PASSWORD = "123456"  # Change this to your desired password
+MASTER_PASSWORD = "Prince@123"  # Set your master password here
+FILE_PASSWORD = "file@123"  # Default file password
+ENCRYPTION_KEY = Fernet.generate_key()  # Generate a key for encryption
+fernet = Fernet(ENCRYPTION_KEY)
 
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 app.config["MAX_CONTENT_LENGTH"] = MAX_FILE_SIZE
@@ -311,7 +316,7 @@ def generate_qr():
     try:
         folder = request.form.get("folder", "").strip()
         # Generate the full URL for the folder, ensuring proper path formatting
-        folder_url = request.host_url.rstrip('/') + '/' + folder.lstrip('/') if folder else request.host_url.rstrip('/')
+        folder_url = request.host_url.rstrip('/') + '/browser/' + folder.lstrip('/') if folder else request.host_url.rstrip('/')
         
         # Create QR code
         qr = qrcode.QRCode(version=1, box_size=10, border=5)
@@ -356,6 +361,110 @@ def generate_qr():
         return jsonify({"success": True, "qr_code": img_str})
     except Exception as e:
         print(f"QR Code Generation Error: {str(e)}")  # Add error logging
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/search", methods=["GET"])
+def search():
+    query = request.args.get("q", "").lower()
+    results = {"files": [], "folders": []}
+    
+    def search_directory(current_path, relative_path=""):
+        items = os.listdir(current_path)
+        
+        for item in items:
+            item_path = os.path.join(current_path, item)
+            relative_item_path = os.path.join(relative_path, item)
+            
+            if os.path.isdir(item_path):
+                if query in item.lower():
+                    results["folders"].append({
+                        "name": item,
+                        "path": relative_item_path
+                    })
+                search_directory(item_path, relative_item_path)
+            else:
+                if query in item.lower():
+                    file_info = get_file_info(item_path)
+                    results["files"].append({
+                        "name": item,
+                        "path": relative_item_path,
+                        "info": file_info,
+                        "formatted_size": format_size(file_info["size"])
+                    })
+    
+    try:
+        search_directory(app.config["UPLOAD_FOLDER"])
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/filter")
+def filter_files():
+    filter_type = request.args.get("type", "all")
+    results = {"files": []}
+    
+    # Define file extensions for each type
+    type_extensions = {
+        "pdf": ["pdf"],
+        "doc": ["doc", "docx"],
+        "zip": ["zip", "rar"],
+        "image": ["png", "jpg", "jpeg", "gif"],
+        "txt": ["txt"],
+        "pptx": ["pptx"]
+    }
+    
+    def scan_directory(current_path, relative_path=""):
+        items = os.listdir(current_path)
+        
+        for item in items:
+            item_path = os.path.join(current_path, item)
+            relative_item_path = os.path.join(relative_path, item)
+            
+            if os.path.isdir(item_path):
+                scan_directory(item_path, relative_item_path)
+            else:
+                extension = item.split('.')[-1].lower() if '.' in item else ""
+                if filter_type == "all" or extension in type_extensions.get(filter_type, []):
+                    file_info = get_file_info(item_path)
+                    results["files"].append({
+                        "name": item,
+                        "path": relative_item_path,
+                        "info": file_info,
+                        "formatted_size": format_size(file_info["size"])
+                    })
+    
+    try:
+        scan_directory(app.config["UPLOAD_FOLDER"])
+        return jsonify(results)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/protected_download/<path:filename>")
+def protected_download(filename):
+    password = request.args.get('password')
+    
+    if not password or password != FILE_PASSWORD:
+        return jsonify({"error": "Invalid password"}), 403
+        
+    try:
+        file_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+            
+        # Read and encrypt the file
+        with open(file_path, 'rb') as file:
+            file_data = file.read()
+            encrypted_data = fernet.encrypt(file_data)
+            
+        response = send_file(
+            BytesIO(encrypted_data),
+            as_attachment=True,
+            download_name=os.path.basename(filename),
+            mimetype='application/octet-stream'
+        )
+        
+        return response
+    except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.errorhandler(413)

@@ -446,6 +446,44 @@
 
             }
         }
+
+        .curtain-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .curtain-top,
+        .curtain-bottom {
+            position: absolute;
+            width: 100%;
+            height: 50%;
+            background: #1a237e;
+            /* Your primary color */
+            transition: transform 1s ease-in-out;
+        }
+
+        .curtain-top {
+            top: 0;
+            transform: translateY(-100%);
+        }
+
+        .curtain-bottom {
+            bottom: 0;
+            transform: translateY(100%);
+        }
+
+        .curtain-top.closing {
+            transform: translateY(0);
+        }
+
+        .curtain-bottom.closing {
+            transform: translateY(0);
+        }
     </style>
 </head>
 
@@ -541,17 +579,7 @@
                             </div>
                             <div class="feature-content">
                                 <h3>QR Code Generation</h3>
-                                <p>Generate unique QR codes for each machine that link directly to their documentation.
-                                </p>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <div class="feature-icon">
-                                <i class="fas fa-file-pdf"></i>
-                            </div>
-                            <div class="feature-content">
-                                <h3>PDF Preview</h3>
-                                <p>Preview PDF documents directly in the browser without downloading.</p>
+                                <p>Generate unique QR codes for each folder that link directly to its contents.</p>
                             </div>
                         </div>
                         <div class="feature-item">
@@ -560,7 +588,18 @@
                             </div>
                             <div class="feature-content">
                                 <h3>Password Protection</h3>
-                                <p>Secure access to documentation with password protection for sensitive operations.</p>
+                                <p>Secure access to file operations with password protection and master password
+                                    control.</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon">
+                                <i class="fas fa-search"></i>
+                            </div>
+                            <div class="feature-content">
+                                <h3>Global Search</h3>
+                                <p>Instantly search through all files and folders across the entire system with
+                                    real-time results.</p>
                             </div>
                         </div>
                     </div>
@@ -569,30 +608,32 @@
                     <div class="feature-grid">
                         <div class="feature-item">
                             <div class="feature-icon">
-                                <i class="fas fa-folder"></i>
+                                <i class="fas fa-filter"></i>
                             </div>
                             <div class="feature-content">
-                                <h3>Smart Organization</h3>
-                                <p>Organize documentation in folders with intuitive navigation and breadcrumb support.
-                                </p>
+                                <h3>Smart Filtering</h3>
+                                <p>Filter files by type including PDFs, Word documents, images, archives, and more with
+                                    one click.</p>
                             </div>
                         </div>
                         <div class="feature-item">
                             <div class="feature-icon">
-                                <i class="fas fa-search"></i>
+                                <i class="fas fa-lock"></i>
                             </div>
                             <div class="feature-content">
-                                <h3>Quick Search</h3>
-                                <p>Search through documentation with real-time filtering and instant results.</p>
+                                <h3>Protected Downloads</h3>
+                                <p>Secure file downloads with password protection to ensure only authorized access to
+                                    sensitive files.</p>
                             </div>
                         </div>
                         <div class="feature-item">
                             <div class="feature-icon">
-                                <i class="fas fa-mobile-alt"></i>
+                                <i class="fas fa-check-square"></i>
                             </div>
                             <div class="feature-content">
-                                <h3>Mobile Ready</h3>
-                                <p>Responsive design that works seamlessly on all devices and screen sizes.</p>
+                                <h3>Multi-Select Operations</h3>
+                                <p>Long-press to select multiple files for batch operations like deletion, with
+                                    intuitive touch interface.</p>
                             </div>
                         </div>
                     </div>
@@ -705,6 +746,11 @@
         </div>
     </section>
 
+    <div class="curtain-container">
+        <div class="curtain-top"></div>
+        <div class="curtain-bottom"></div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         // Navbar scroll effect
@@ -754,6 +800,18 @@
             el.style.transition = 'all 0.6s ease-out';
             observer.observe(el);
         });
+
+        function closeCurtain(event) {
+            event.preventDefault();
+            const targetHref = event.currentTarget.href;
+
+            document.querySelector('.curtain-top').classList.add('closing');
+            document.querySelector('.curtain-bottom').classList.add('closing');
+
+            setTimeout(() => {
+                window.location.href = targetHref;
+            }, 1000);
+        }
     </script>
 </body>
 
