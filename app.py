@@ -55,9 +55,14 @@ def format_size(size):
         size /= 1024
     return f"{size:.2f} TB"
 
-# Home route - Show folders & files
-@app.route("/", defaults={"folder": ""})
-@app.route("/<path:folder>")
+# Home route - Show home page
+@app.route("/")
+def home():
+    return render_template("home.html")
+
+# File browser route - Show folders & files
+@app.route("/browser", defaults={"folder": ""})
+@app.route("/browser/<path:folder>")
 def list_files(folder):
     try:
         folder_path = os.path.join(app.config["UPLOAD_FOLDER"], folder)

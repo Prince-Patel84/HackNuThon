@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+    <!-- Background -->
+    <rect width="800" height="600" fill="#f8f9fa"/>
+    
+    <!-- Excavator Base -->
+    <rect x="300" y="400" width="200" height="100" fill="#1a237e" rx="10"/>
+    <rect x="350" y="350" width="100" height="150" fill="#0d47a1" rx="5"/>
+    
+    <!-- Excavator Arm -->
+    <path d="M400,350 L500,250 L550,300 L450,400 Z" fill="#ff3d00"/>
+    <path d="M500,250 L600,200 L650,250 L550,300 Z" fill="#ff3d00"/>
+    
+    <!-- Bucket -->
+    <path d="M600,200 L650,180 L670,220 L620,240 Z" fill="#ff3d00"/>
+    
+    <!-- Wheels -->
+    <circle cx="350" cy="500" r="30" fill="#1a237e"/>
+    <circle cx="450" cy="500" r="30" fill="#1a237e"/>
+    <circle cx="550" cy="500" r="30" fill="#1a237e"/>
+    
+    <!-- Control Panel -->
+    <rect x="380" y="370" width="40" height="60" fill="#ff3d00" rx="5"/>
+    <circle cx="400" cy="400" r="5" fill="white"/>
+    <circle cx="400" cy="420" r="5" fill="white"/>
+    <circle cx="400" cy="440" r="5" fill="white"/>
+    
+    <!-- QR Code -->
+    <rect x="350" y="300" width="100" height="100" fill="white" stroke="#1a237e" stroke-width="2"/>
+    <rect x="370" y="320" width="20" height="20" fill="#1a237e"/>
+    <rect x="410" y="320" width="20" height="20" fill="#1a237e"/>
+    <rect x="370" y="360" width="20" height="20" fill="#1a237e"/>
+    <rect x="410" y="360" width="20" height="20" fill="#1a237e"/>
+    
+    <!-- Documentation -->
+    <rect x="200" y="200" width="150" height="200" fill="white" rx="5" stroke="#1a237e" stroke-width="2"/>
+    <line x1="220" y1="220" x2="330" y2="220" stroke="#1a237e" stroke-width="2"/>
+    <line x1="220" y1="240" x2="330" y2="240" stroke="#1a237e" stroke-width="1"/>
+    <line x1="220" y1="260" x2="330" y2="260" stroke="#1a237e" stroke-width="1"/>
+    
+    <!-- Decorative Elements -->
+    <circle cx="100" cy="100" r="40" fill="#1a237e" opacity="0.1"/>
+    <circle cx="700" cy="500" r="30" fill="#ff3d00" opacity="0.1"/>
+</svg> 
