@@ -235,10 +235,6 @@ def rename_item():
         if not old_name or not new_name:
             return jsonify({"error": "Old and new names are required"}), 400
 
-        # Prevent renaming in root directory for folders
-        if is_folder and not folder:
-            return jsonify({"error": "Folders can only be renamed in the root directory"}), 400
-
         # Get the full paths
         old_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, old_name)
         new_path = os.path.join(app.config["UPLOAD_FOLDER"], folder, new_name)
