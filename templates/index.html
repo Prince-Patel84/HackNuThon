@@ -356,7 +356,7 @@
                     <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#createFolderModal">
                         <i class="fas fa-folder-plus"></i> Create Folder
                     </button>
-    {% endif %}
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -415,13 +415,14 @@
                     </button>
                 </div>
             </div>
-        {% endfor %}
+            {% endfor %}
         </div>
 
         <!-- Files Section -->
-        <h3 class="section-title">Files</h3>
+        {% if folder %}
+        <h2 class="mb-4">Files</h2>
         <div class="file-grid">
-        {% for file in files %}
+            {% for file in files %}
             <div class="file-card">
                 <div class="form-check position-absolute p-2">
                     <input class="form-check-input select-item" type="checkbox" data-name="{{ file.name }}"
@@ -429,11 +430,11 @@
                 </div>
                 <div class="preview-container">
                     {% set file_extension = file.name.rsplit('.', 1)[1].lower() %}
-            {% if file_extension in ['png', 'jpg', 'jpeg'] %}
+                    {% if file_extension in ['png', 'jpg', 'jpeg'] %}
                     <img src="{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}" alt="{{ file.name }}"
                         class="preview-image"
                         onclick="previewImage('{{ url_for('uploaded_file', filename=folder + '/' + file.name) }}', '{{ file.name }}')">
-            {% elif file_extension == 'pdf' %}
+                    {% elif file_extension == 'pdf' %}
                     <i class="fas fa-file-pdf preview-icon text-danger"></i>
                     {% elif file_extension in ['doc', 'docx'] %}
                     <i class="fas fa-file-word preview-icon text-primary"></i>
@@ -443,9 +444,9 @@
                     <i class="fas fa-file-archive preview-icon text-warning"></i>
                     {% elif file_extension == 'pptx' %}
                     <i class="fas fa-file-powerpoint preview-icon text-danger"></i>
-            {% else %}
+                    {% else %}
                     <i class="fas fa-file preview-icon text-secondary"></i>
-            {% endif %}
+                    {% endif %}
                 </div>
                 <div class="file-info">
                     <div class="file-name">{{ file.name }}</div>
@@ -475,6 +476,7 @@
             </div>
             {% endfor %}
         </div>
+        {% endif %}
     </div>
 
     <!-- Toast for notifications -->
@@ -585,7 +587,7 @@
                             <label for="newName" class="form-label">New Name</label>
                             <input type="text" class="form-control" id="newName" required autofocus>
                         </div>
-            </form>
+                    </form>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

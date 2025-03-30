@@ -1,9 +1,0 @@
-Operation Manual
-Machine: CNC Router X-2000
-Version: 2.1
-Last Updated: 2025-03-30
-
-1. Safety Guidelines
-2. Operating Procedures
-3. Maintenance Schedule
-4. Troubleshooting Guide
