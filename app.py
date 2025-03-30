@@ -18,7 +18,7 @@ UPLOAD_FOLDER = "uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "pdf", "doc", "docx", "txt", "zip", "rar", "pptx"}
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 ADMIN_PASSWORD = "123456"  # Change this to your desired password
-MASTER_PASSWORD = "Prince@123"  # Set your master password here
+MASTER_PASSWORD = "master123"  # Set a secure master password here
 FILE_PASSWORD = "file@123"  # Default file password
 ENCRYPTION_KEY = Fernet.generate_key()  # Generate a key for encryption
 fernet = Fernet(ENCRYPTION_KEY)
@@ -501,6 +501,34 @@ def bulk_delete():
             "deleted": deleted_files,
             "failed": failed_files
         })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/change_password", methods=["POST"])
+def change_password():
+    master_password = request.form.get('master_password')
+    new_password = request.form.get('new_password')
+    
+    # Check if master password is correct
+    if master_password != MASTER_PASSWORD:
+        return jsonify({"error": "Incorrect master password"}), 403
+        
+    try:
+        # Read the current file content
+        with open(__file__, 'r') as file:
+            content = file.read()
+            
+        # Replace the old password with new password
+        new_content = content.replace(
+            f'ADMIN_PASSWORD = "{ADMIN_PASSWORD}"',
+            f'ADMIN_PASSWORD = "{new_password}"'
+        )
+        
+        # Write the new content back to the file
+        with open(__file__, 'w') as file:
+            file.write(new_content)
+            
+        return jsonify({"success": True, "message": "Password changed successfully"})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
